@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "./helper.sol";
+import "./ECDSA.sol";
 
 contract Channel {
-
+    using ECDSA for bytes32;
 	uint64 disputePeriod = 1 days;
 
 	enum Progression {PROPOSED,ACCEPTED,CLOSED}
 
 	struct ChannelState {
-		address a;
-		address b;
+		address payable a;
+		address payable b;
 		uint256 valueA;
 		uint256 valueB;
 		Progression progression;
@@ -48,8 +48,8 @@ contract Channel {
 	}
 
 	function hashState(ChannelState memory state) public pure returns (bytes32) {
-		// TODO hash the state
-		return 0;
+		bytes memory encoded = abi.encode(state.a, state.b, state.valueA, state.valueB, state.progression, state.round);
+		return keccak256(encoded);
 	}
 
 	function other(ChannelState memory state, address _address) private pure returns (address) {
@@ -91,14 +91,14 @@ contract Channel {
 	function challenge(
 		ChannelState memory oldState, 
 		ChannelState memory newState,  
-		bytes[] calldata sig, 
+		bytes memory sig, 
 		bytes32 id)
 		public payable inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			address aorb = other(oldState, msg.sender);
 			require(aorb != address(0), "invalid other");
 			bytes32 hash = hashState(newState);
-			require(helper.verifySig(hash, sig, aorb), "invalid signature");
+			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
 			require(disputes[id].time == 0, "dispute already in progress");
 			channels[id] = hash;
 			disputes[id].time = uint64(block.timestamp);
@@ -109,14 +109,14 @@ contract Channel {
 	function disputeChallenge(
 		ChannelState calldata oldState, 
 		ChannelState memory newState,  
-		bytes[] calldata sig, 
+		bytes memory sig, 
 		bytes32 id)
 		public payable inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			address aorb = other(oldState, msg.sender);
 			require(aorb == disputes[id].closer, "invalid closer");
 			bytes32 hash = hashState(newState);
-			require(helper.verifySig(hash, sig, aorb), "invalid signature");
+			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
 			require(oldState.round < newState.round, "disputed challenge with old state");
 			channels[id] = hash;
 			disputes[id].time = uint64(block.timestamp);
@@ -127,20 +127,22 @@ contract Channel {
 	function payout(ChannelState memory newState, bytes32 id) internal {
 		// brick the channel
 		channels[id] = 0;
-		// TODO transfer the funds
+		// ignore failure conditions to prevent griefing
+		newState.a.send(newState.valueA);
+		newState.b.send(newState.valueB);
 	}
 
 	function CooperativeClose(
 		ChannelState calldata oldState, 
 		ChannelState memory newState,  
-		bytes[] calldata sig, 
+		bytes memory sig, 
 		bytes32 id)
-		public payable inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
+		public inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			require(newState.progression == Progression.CLOSED, "new state not closed");
 			address aorb = other(oldState, msg.sender);
 			bytes32 hash = hashState(newState);
-			require(helper.verifySig(hash, sig, aorb), "invalid signature");
+			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
 			payout(newState, id);
 			emit Closed(id);
 	}
@@ -148,7 +150,7 @@ contract Channel {
 	function ForceClose(
 		ChannelState calldata oldState,
 		bytes32 id)
-		public payable inState(oldState, Progression.ACCEPTED) {
+		public inState(oldState, Progression.ACCEPTED) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			require(disputes[id].time != 0, "no dispute available");
 			require(disputes[id].time + disputePeriod < block.timestamp , "force close before dispute period");
