@@ -68,6 +68,7 @@ contract Channel {
 			require(msg.value == state.valueA, "proposer must add enough value");
 			require(channels[id] == 0, "channel already in use");
 			require(state.round == 0, "round set in channel opening");
+			require(state.progression == Progression.PROPOSED, "can only open channel in state proposed");
 			bytes32 hash = hashState(state);
 			channels[id] = hash;
 			emit Open(id);
