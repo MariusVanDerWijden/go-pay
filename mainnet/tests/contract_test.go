@@ -6,12 +6,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	gopay "github.com/mariusvanderwijden/go-pay"
+	"github.com/mariusvanderwijden/go-pay/helpers"
 )
 
-func setupChannel(t *testing.T) (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contract *Channel, backend *backends.SimulatedBackend, openMsg ChannelChannelState) {
+func setupChannel(t *testing.T) (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contract *Channel, backend *helpers.SimulatedBackend, openMsg ChannelChannelState) {
 	skA, skB, addrA, addrB, contract, backend = setupEnv()
 	// A opens a channel
 	openMsg = ChannelChannelState{
@@ -29,7 +28,7 @@ func setupChannel(t *testing.T) (skA, skB *ecdsa.PrivateKey, addrA, addrB common
 		t.Error()
 	}
 	backend.Commit()
-	if err := gopay.MustMineSuccessfully(backend, tx); err != nil {
+	if err := helpers.MustMineSuccessfully(backend, tx); err != nil {
 		t.Fatal(err)
 	}
 	return
@@ -114,7 +113,7 @@ func TestOpenChannelIDInUse(t *testing.T) {
 		t.Error()
 	}
 	backend.Commit()
-	if err := gopay.MustMineSuccessfully(backend, tx); err != nil {
+	if err := helpers.MustMineSuccessfully(backend, tx); err != nil {
 		t.Fatal(err)
 	}
 	// try to open a channel on the same channelid
@@ -164,7 +163,7 @@ func TestOpenRoundSet(t *testing.T) {
 	}
 }
 
-func setupChannelAndAccept(t *testing.T) (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contract *Channel, backend *backends.SimulatedBackend, acceptMsg ChannelChannelState) {
+func setupChannelAndAccept(t *testing.T) (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contract *Channel, backend *helpers.SimulatedBackend, acceptMsg ChannelChannelState) {
 	_, skB, addrA, addrB, contract, backend, openMsg := setupChannel(t)
 	// B accepts the channel
 	acceptMsg = ChannelChannelState{
@@ -182,7 +181,7 @@ func setupChannelAndAccept(t *testing.T) (skA, skB *ecdsa.PrivateKey, addrA, add
 		t.Error(err)
 	}
 	backend.Commit()
-	if err := gopay.MustMineSuccessfully(backend, tx); err != nil {
+	if err := helpers.MustMineSuccessfully(backend, tx); err != nil {
 		t.Fatal(err)
 	}
 	return

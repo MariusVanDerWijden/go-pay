@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	gopay "github.com/mariusvanderwijden/go-pay"
+	"github.com/mariusvanderwijden/go-pay/helpers"
 )
 
-func setupEnv() (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contract *Channel, backend *backends.SimulatedBackend) {
-	backend, faucetSK := gopay.GetSimBackend()
+func setupEnv() (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contract *Channel, backend *helpers.SimulatedBackend) {
+	backend, faucetSK := helpers.GetSimBackend()
 	contract, _, err := deployChannel(backend, faucetSK)
 	if err != nil {
 		panic(err)
@@ -23,8 +22,8 @@ func setupEnv() (skA, skB *ecdsa.PrivateKey, addrA, addrB common.Address, contra
 	skB, _ = crypto.GenerateKey()
 	addrA = crypto.PubkeyToAddress(skA.PublicKey)
 	addrB = crypto.PubkeyToAddress(skB.PublicKey)
-	gopay.Fund(backend, faucetSK, addrA)
-	gopay.Fund(backend, faucetSK, addrB)
+	helpers.Fund(backend, faucetSK, addrA)
+	helpers.Fund(backend, faucetSK, addrB)
 	return
 }
 
@@ -84,7 +83,7 @@ func TestWalkthrough(t *testing.T) {
 		t.Error(err)
 	}
 	backend.Commit()
-	if err = gopay.MustMineSuccessfully(backend, tx); err != nil {
+	if err = helpers.MustMineSuccessfully(backend, tx); err != nil {
 		t.Error(err)
 	}
 }
@@ -137,7 +136,7 @@ func TestForceClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	backend.Commit()
-	if err = gopay.MustMineSuccessfully(backend, tx); err != nil {
+	if err = helpers.MustMineSuccessfully(backend, tx); err != nil {
 		t.Error(err)
 	}
 	backend.AdjustTime(25 * time.Hour)
@@ -149,7 +148,7 @@ func TestForceClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	backend.Commit()
-	if err = gopay.MustMineSuccessfully(backend, tx); err != nil {
+	if err = helpers.MustMineSuccessfully(backend, tx); err != nil {
 		t.Fatal(err)
 	}
 }

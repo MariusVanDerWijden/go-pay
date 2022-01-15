@@ -6,12 +6,12 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/mariusvanderwijden/go-pay/helpers"
 )
 
-func deployChannel(backend *backends.SimulatedBackend, sk *ecdsa.PrivateKey) (*Channel, common.Address, error) {
+func deployChannel(backend *helpers.SimulatedBackend, sk *ecdsa.PrivateKey) (*Channel, common.Address, error) {
 	transactor, _ := bind.NewKeyedTransactorWithChainID(sk, big.NewInt(1337))
 	addr, tx, contract, err := DeployChannel(transactor, backend)
 	if err != nil {

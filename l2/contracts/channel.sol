@@ -92,12 +92,12 @@ contract Channel {
 
     function disputeChallenge(bytes32 id, uint256 valueA, uint256 valueB, uint128 round, bytes memory sig)
         public inState(id, Prog.DISPUTED) validState(id, valueA, valueB) {
+			require(channels[id].round < round, "disputed challenge with old state");
             address aorb = other(id, msg.sender);
 			require(aorb != address(0), "invalid other");
             require(disputes[id].closer == aorb, "invalid dispute challenger");
 			bytes32 hash = hashState(id, channels[id], valueA, valueB, round);
 			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
-			require(channels[id].round < channels[id].round, "disputed challenge with old state");
             disputes[id].closer = msg.sender;
             disputes[id].time = uint64(block.timestamp);
 			emit Closing(id, round, uint64(block.timestamp));
