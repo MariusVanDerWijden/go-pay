@@ -1,4 +1,4 @@
-package tests
+package gopay
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func getSimBackend() (*backends.SimulatedBackend, *ecdsa.PrivateKey) {
+func GetSimBackend() (*backends.SimulatedBackend, *ecdsa.PrivateKey) {
 	sk, err := crypto.GenerateKey()
 	if err != nil {
 		panic(err)
@@ -35,20 +35,7 @@ func getSimBackend() (*backends.SimulatedBackend, *ecdsa.PrivateKey) {
 	return backends.NewSimulatedBackend(alloc, 80000000), sk
 }
 
-func deployChannel(backend *backends.SimulatedBackend, sk *ecdsa.PrivateKey) (*Channel, common.Address, error) {
-	transactor, _ := bind.NewKeyedTransactorWithChainID(sk, big.NewInt(1337))
-	addr, tx, contract, err := DeployChannel(transactor, backend)
-	if err != nil {
-		return nil, common.Address{}, err
-	}
-	backend.Commit()
-	if _, err = bind.WaitDeployed(context.Background(), backend, tx); err != nil {
-		return nil, common.Address{}, err
-	}
-	return contract, addr, nil
-}
-
-func fund(backend *backends.SimulatedBackend, sk *ecdsa.PrivateKey, recipient common.Address) error {
+func Fund(backend *backends.SimulatedBackend, sk *ecdsa.PrivateKey, recipient common.Address) error {
 	sender := crypto.PubkeyToAddress(sk.PublicKey)
 	nonce, err := backend.PendingNonceAt(context.Background(), sender)
 	if err != nil {
@@ -65,18 +52,7 @@ func fund(backend *backends.SimulatedBackend, sk *ecdsa.PrivateKey, recipient co
 	return err
 }
 
-func signChannelState(msg ChannelChannelState, channel Channel, sk *ecdsa.PrivateKey) ([32]byte, []byte, error) {
-	hash, err := channel.HashState(&bind.CallOpts{}, msg)
-	if err != nil {
-		return [32]byte{}, []byte{}, err
-	}
-	sig, err := crypto.Sign(hash[:], sk)
-	// The ECDSA library requires v to be 27 or 28, secp returns either 0 or 1
-	sig[len(sig)-1] += 27
-	return hash, sig, err
-}
-
-func mustMineSuccessfully(backend *backends.SimulatedBackend, tx *types.Transaction) error {
+func MustMineSuccessfully(backend *backends.SimulatedBackend, tx *types.Transaction) error {
 	receipt, err := bind.WaitMined(context.Background(), backend, tx)
 	if err != nil {
 		return err

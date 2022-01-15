@@ -94,7 +94,7 @@ contract Channel {
 		ChannelState memory newState,  
 		bytes memory sig, 
 		bytes32 id)
-		public payable inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
+		public inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			address aorb = other(oldState, msg.sender);
 			require(aorb != address(0), "invalid other");
@@ -112,7 +112,7 @@ contract Channel {
 		ChannelState memory newState,  
 		bytes memory sig, 
 		bytes32 id)
-		public payable inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
+		public inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			address aorb = other(oldState, msg.sender);
 			require(aorb == disputes[id].closer, "invalid closer");
