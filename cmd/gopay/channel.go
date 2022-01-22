@@ -168,10 +168,70 @@ func useChannel() error {
 }
 
 func send() error {
+	prompt := promptui.Prompt{Label: "How much do you want to deposit?"}
+	str, err := prompt.Run()
+	if err != nil {
+		return err
+	}
+	value, ok := new(big.Int).SetString(str, 0)
+	if !ok {
+		return errors.New("couldn't parse number")
+	}
+	hash, err := channel.SendMoney(value)
+	if err != nil {
+		return err
+	}
+	sig, err := signer.SignData(signer.Accounts()[0], "hash", hash[:])
+	if err != nil {
+		return err
+	}
+	color.Cyan("Sending signature to peer: %v", sig)
+	signature := SignatureMsg{
+		ValueA:    channel.ValueA,
+		ValueB:    channel.ValueB,
+		Round:     channel.Round,
+		Signature: sig,
+	}
+	enc := gob.NewEncoder(peer)
+	if err := enc.Encode(signature); err != nil {
+		return err
+	}
+	return nil
+}
+
+func receive() error {
+	dec := gob.NewDecoder(peer)
+	var sigMsg SignatureMsg
+	if err := dec.Decode(&sigMsg); err != nil {
+		return err
+	}
+	err := channel.ReceivedSignature(sigMsg.ValueA, sigMsg.ValueB, sigMsg.Round, sigMsg.Signature)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func closeChannel() error {
+	hash, err := channel.CreateCooperativeClose()
+	if err != nil {
+		return err
+	}
+	sig, err := signer.SignData(signer.Accounts()[0], "hash", hash[:])
+	if err != nil {
+		return err
+	}
+	color.Cyan("Sending closing signature to peer: %v", sig)
+	signature := SignatureMsg{
+		ValueA:    channel.ValueA,
+		ValueB:    channel.ValueB,
+		Round:     channel.Round,
+		Signature: sig,
+	}
+	enc := gob.NewEncoder(peer)
+	if err := enc.Encode(signature); err != nil {
+		return err
+	}
 	return nil
 }
 

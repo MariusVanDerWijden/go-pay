@@ -210,6 +210,7 @@ func (c *Channel) FinishForceClose(auth *bind.TransactOpts, peerSignature []byte
 }
 
 func (c *Channel) SendMoney(value *big.Int) ([32]byte, error) {
+	// TODO return mimedata for signing
 	var (
 		valA  *big.Int
 		valB  *big.Int

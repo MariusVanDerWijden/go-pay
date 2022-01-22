@@ -16,3 +16,10 @@ type OpenChannelMsg struct {
 type ChannelIDMsg struct {
 	ID [32]byte
 }
+
+type SignatureMsg struct {
+	ValueA    *big.Int
+	ValueB    *big.Int
+	Round     *big.Int
+	Signature []byte
+}
