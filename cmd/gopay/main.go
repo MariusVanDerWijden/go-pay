@@ -34,23 +34,27 @@ func main() {
 			color.Red("Goodbye: %v", err)
 			return
 		}
-		switch index {
-		case 0:
-			err = startListener()
-		case 1:
-			err = connectToPeer()
-		case 2:
-			err = connectToBackend()
-		case 3:
-			err = setupExternalSigner()
-		case 4:
-			err = setupChannel()
-		}
+		err = mainSwitch(index)
 		if err != nil {
 			color.Red("Error: %v", err)
 		}
 	}
+}
 
+func mainSwitch(index int) error {
+	switch index {
+	case 0:
+		return startListener()
+	case 1:
+		return connectToPeer()
+	case 2:
+		return connectToBackend()
+	case 3:
+		return setupExternalSigner()
+	case 4:
+		return setupChannel()
+	}
+	return nil
 }
 
 func validateIP(input string) error {
