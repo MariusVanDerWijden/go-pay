@@ -15,11 +15,14 @@ import (
 var (
 	LocalHost = "127.0.0.1"
 	Port      = 9580
-	peer      net.Conn
-	backend   *ethclient.Client
-	channel   *gopay.Channel
-	signer    *external.ExternalSigner
 )
+
+type Backend struct {
+	peer    net.Conn
+	backend *ethclient.Client
+	channel *gopay.Channel
+	signer  *external.ExternalSigner
+}
 
 func main() {
 	color.Green("Welcome to go-pay")
@@ -27,6 +30,7 @@ func main() {
 		Label: "Choose one of the following options",
 		Items: []string{"Start Listener", "Connect to Peer", "Connect to Blockchain", "Setup External Signer (clef)", "Setup Channel"},
 	}
+	backend := Backend{}
 
 	for {
 		index, _, err := promptInit.Run()
@@ -34,25 +38,25 @@ func main() {
 			color.Red("Goodbye: %v", err)
 			return
 		}
-		err = mainSwitch(index)
+		err = backend.mainSwitch(index)
 		if err != nil {
 			color.Red("Error: %v", err)
 		}
 	}
 }
 
-func mainSwitch(index int) error {
+func (b *Backend) mainSwitch(index int) error {
 	switch index {
 	case 0:
-		return startListener()
+		return b.startListener()
 	case 1:
-		return connectToPeer()
+		return b.connectToPeer()
 	case 2:
-		return connectToBackend()
+		return b.connectToBackend()
 	case 3:
-		return setupExternalSigner()
+		return b.setupExternalSigner()
 	case 4:
-		return setupChannel()
+		return b.setupChannel()
 	}
 	return nil
 }
@@ -65,7 +69,7 @@ func validateIP(input string) error {
 	return nil
 }
 
-func connectToPeer() error {
+func (b *Backend) connectToPeer() error {
 	prompt := promptui.Prompt{
 		Label:    "IP",
 		Validate: validateIP,
@@ -79,11 +83,11 @@ func connectToPeer() error {
 		return err
 	}
 	color.Green("Connected to peer: %v", conn.RemoteAddr())
-	peer = conn
+	b.peer = conn
 	return nil
 }
 
-func connectToBackend() error {
+func (b *Backend) connectToBackend() error {
 	prompt := promptui.Prompt{Label: "Blockchain node address"}
 	str, err := prompt.Run()
 	if err != nil {
@@ -93,11 +97,11 @@ func connectToBackend() error {
 	if err != nil {
 		return err
 	}
-	backend = client
+	b.backend = client
 	return nil
 }
 
-func setupExternalSigner() error {
+func (b *Backend) setupExternalSigner() error {
 	prompt := promptui.Prompt{Label: "External Signer Endpoint"}
 	str, err := prompt.Run()
 	if err != nil {
@@ -107,11 +111,11 @@ func setupExternalSigner() error {
 	if err != nil {
 		return err
 	}
-	signer = sig
+	b.signer = sig
 	return nil
 }
 
-func startListener() error {
+func (b *Backend) startListener() error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%v:%v", LocalHost, Port))
 	if err != nil {
 		return err
@@ -123,7 +127,7 @@ func startListener() error {
 			return
 		}
 		color.Green("Peer connected: %v", conn.RemoteAddr())
-		peer = conn
+		b.peer = conn
 	}()
 	return nil
 }
