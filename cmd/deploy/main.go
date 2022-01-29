@@ -72,7 +72,7 @@ func setupSigner() error {
 }
 
 func deploy() error {
-	auth := bind.NewClefTransactor(signer, signer.Accounts()[0])
+	auth := bind.NewClefTransactor(signer, signer.Accounts()[1])
 	address, tx, _, err := l2.DeployChannel(auth, backend)
 	if err != nil {
 		return err

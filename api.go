@@ -1,10 +1,10 @@
 package gopay
 
 import (
+	crand "crypto/rand"
 	"errors"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -73,7 +73,7 @@ func NewChannel(backend Backend, addrA, addrB common.Address, valueA, valueB *bi
 
 func (c *Channel) Open(auth *bind.TransactOpts) ([32]byte, error) {
 	var id [32]byte
-	if _, err := rand.Read(id[:]); err != nil {
+	if _, err := crand.Read(id[:]); err != nil {
 		return [32]byte{}, err
 	}
 	auth.Value = c.ValueA

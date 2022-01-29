@@ -96,6 +96,13 @@ func (b *Backend) createChannel() error {
 }
 
 func (b *Backend) acceptCreateChannel() error {
+	prompt := promptui.Prompt{Label: "GoPay contract address"}
+	str, err := prompt.Run()
+	if err != nil {
+		return err
+	}
+	gopay.ChannelAddr = common.HexToAddress(str)
+	color.Yellow("Contract address: %v", gopay.ChannelAddr)
 	color.White("Waiting for opening message from peer")
 	dec := gob.NewDecoder(b.peer)
 	var openMsg OpenChannelMsg
@@ -181,7 +188,7 @@ func (b *Backend) send() error {
 	if err != nil {
 		return err
 	}
-	sig, err := b.signer.SignData(b.signer.Accounts()[0], "hash", hash[:])
+	sig, err := b.signer.SignData(b.signer.Accounts()[1], "hash", hash[:])
 	if err != nil {
 		return err
 	}
@@ -217,7 +224,7 @@ func (b *Backend) closeChannel() error {
 	if err != nil {
 		return err
 	}
-	sig, err := b.signer.SignData(b.signer.Accounts()[0], "hash", hash[:])
+	sig, err := b.signer.SignData(b.signer.Accounts()[1], "hash", hash[:])
 	if err != nil {
 		return err
 	}
