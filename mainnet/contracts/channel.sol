@@ -57,7 +57,7 @@ contract Channel {
 			return state.b;
 		if(_address == state.b)
 			return state.a;
-		return address(0);
+		require(false, "invalid other");
 	}
 
 	function open(
@@ -97,7 +97,6 @@ contract Channel {
 		public inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			address aorb = other(oldState, msg.sender);
-			require(aorb != address(0), "invalid other");
 			bytes32 hash = hashState(newState);
 			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
 			require(disputes[id].time == 0, "dispute already in progress");
@@ -115,7 +114,6 @@ contract Channel {
 		public inState(oldState, Progression.ACCEPTED) validState(oldState, newState) {
 			require(channels[id] == hashState(oldState), "invalid old state");
 			address aorb = other(oldState, msg.sender);
-			require(aorb == disputes[id].closer, "invalid closer");
 			bytes32 hash = hashState(newState);
 			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
 			require(oldState.round < newState.round, "disputed challenge with old state");
