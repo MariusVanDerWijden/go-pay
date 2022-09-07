@@ -53,9 +53,9 @@ contract Channel {
 	function other(bytes32 id, address _address) private view returns (address) {
 		if(_address == channels[id].a)
 			return channels[id].b;
-		if(_address == channels[id].a)
+		if(_address == channels[id].b)
 			return channels[id].a;
-		return address(0);
+		require(false, "invalid other");
 	}
 
 	function open(
@@ -81,7 +81,6 @@ contract Channel {
 	function challenge(bytes32 id, uint256 valueA, uint256 valueB, uint128 round, bytes memory sig) 
         public inState(id, Prog.ACCEPTED) validState(id, valueA, valueB) {
             address aorb = other(id, msg.sender);
-			require(aorb != address(0), "invalid other");
 			bytes32 hash = hashState(id, channels[id], valueA, valueB, round);
 			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
             channels[id].progression = Prog.DISPUTED;
@@ -94,7 +93,6 @@ contract Channel {
         public inState(id, Prog.DISPUTED) validState(id, valueA, valueB) {
 			require(channels[id].round < round, "disputed challenge with old state");
             address aorb = other(id, msg.sender);
-			require(aorb != address(0), "invalid other");
             require(disputes[id].closer == aorb, "invalid dispute challenger");
 			bytes32 hash = hashState(id, channels[id], valueA, valueB, round);
 			require(ECDSA.recover(hash, sig) == aorb, "invalid signature");
@@ -112,7 +110,7 @@ contract Channel {
 		payable(channels[id].b).send(valueB);
 	}
 
-    function CooperativeClose(bytes32 id, uint256 valueA, uint256 valueB, bytes memory sig) 
+    function cooperativeClose(bytes32 id, uint256 valueA, uint256 valueB, bytes memory sig) 
         public inState(id, Prog.ACCEPTED) validState(id, valueA, valueB) {
             address aorb = other(id, msg.sender);
 			bytes32 hash = hashState(id, channels[id], valueA, valueB, cooperativeCloseRound);
@@ -121,7 +119,7 @@ contract Channel {
 			emit Closed(id);
     }
 
-    function ForceClose(bytes32 id) 
+    function forceClose(bytes32 id) 
         public inState(id, Prog.DISPUTED) {
             require(disputes[id].time != 0, "no dispute available");
 			require(disputes[id].time + disputePeriod < block.timestamp , "force close before dispute period");

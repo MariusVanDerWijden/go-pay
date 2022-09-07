@@ -1,3 +1,5 @@
 cmd/gopay/gopay
 cmd/gopay/audit.log
 cmd/deploy/deploy
+*.abi
+*.bin
