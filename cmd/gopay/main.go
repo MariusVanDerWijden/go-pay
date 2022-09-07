@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	LocalHost = "127.0.0.1"
-	Port      = 9580
+	LocalHost         = "127.0.0.1"
+	Port              = 9580
+	DefaultConfigFile = "config.toml"
 )
 
 type Backend struct {

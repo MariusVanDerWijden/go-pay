@@ -8,9 +8,9 @@ type Config struct {
 	ContractAddress string
 }
 
-func readConfig() Config {
+func readConfig(path string) Config {
 	var conf Config
-	if _, err := toml.DecodeFile("config.toml", &conf); err != nil {
+	if _, err := toml.DecodeFile(path, &conf); err != nil {
 		panic(err)
 	}
 	return conf
