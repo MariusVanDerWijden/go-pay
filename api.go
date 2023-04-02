@@ -208,11 +208,12 @@ func (c *Channel) StartForceClose(auth *bind.TransactOpts) (time.Time, error) {
 
 // DisputeForceClose disputes a force close procedure.
 // It returns the time when the force close is finished.
-func (c *Channel) DisputeForceClose(auth *bind.TransactOpts, start uint64) (time.Time, error) {
+// `startBlock` denotes a block resonably long before the force close happened.
+func (c *Channel) DisputeForceClose(auth *bind.TransactOpts, startBlock uint64) (time.Time, error) {
 	// Setup event filtering
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	it, err := c.channel.FilterClosing(&bind.FilterOpts{Context: ctx, Start: start}, [][32]byte{c.metadata.ID})
+	it, err := c.channel.FilterClosing(&bind.FilterOpts{Context: ctx, Start: startBlock}, [][32]byte{c.metadata.ID})
 	if err != nil {
 		return time.Time{}, err
 	}
