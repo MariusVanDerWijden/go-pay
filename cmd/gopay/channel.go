@@ -122,7 +122,7 @@ func (b *Backend) acceptCreateChannel() error {
 
 func (b *Backend) openChannel() error {
 	color.White("Opening channel")
-	txOpts := bind.NewClefTransactor(b.signer, accounts.Account{Address: b.channel.A})
+	txOpts := bind.NewClefTransactor(b.signer, accounts.Account{Address: b.channel.MetaData().A})
 	channelID, err := b.channel.Open(txOpts)
 	if err != nil {
 		return err
@@ -142,7 +142,7 @@ func (b *Backend) acceptChannel() error {
 	if err := dec.Decode(&idMsg); err != nil {
 		return err
 	}
-	txOpts := bind.NewClefTransactor(b.signer, accounts.Account{Address: b.channel.B})
+	txOpts := bind.NewClefTransactor(b.signer, accounts.Account{Address: b.channel.MetaData().B})
 	if err := b.channel.Accept(txOpts, idMsg.ID); err != nil {
 		return err
 	}
@@ -193,10 +193,12 @@ func (b *Backend) send() error {
 		return err
 	}
 	color.Cyan("Sending signature to peer: %v", sig)
+
+	currentState := b.channel.CurrentState()
 	signature := SignatureMsg{
-		ValueA:    b.channel.ValueA,
-		ValueB:    b.channel.ValueB,
-		Round:     b.channel.Round,
+		ValueA:    currentState.ValueA,
+		ValueB:    currentState.ValueB,
+		Round:     currentState.Round,
 		Signature: sig,
 	}
 	enc := gob.NewEncoder(b.peer)
@@ -212,7 +214,7 @@ func (b *Backend) receive() error {
 	if err := dec.Decode(&sigMsg); err != nil {
 		return err
 	}
-	err := b.channel.ReceivedSignature(sigMsg.ValueA, sigMsg.ValueB, sigMsg.Round, sigMsg.Signature)
+	err := b.channel.ReceivedMoney(sigMsg.ValueA, sigMsg.ValueB, sigMsg.Round, sigMsg.Signature)
 	if err != nil {
 		return err
 	}
@@ -220,7 +222,7 @@ func (b *Backend) receive() error {
 }
 
 func (b *Backend) closeChannel() error {
-	hash, err := b.channel.CreateCooperativeClose()
+	hash, err := b.channel.CreateCoopClose()
 	if err != nil {
 		return err
 	}
@@ -229,10 +231,11 @@ func (b *Backend) closeChannel() error {
 		return err
 	}
 	color.Cyan("Sending closing signature to peer: %v", sig)
+	currentState := b.channel.CurrentState()
 	signature := SignatureMsg{
-		ValueA:    b.channel.ValueA,
-		ValueB:    b.channel.ValueB,
-		Round:     b.channel.Round,
+		ValueA:    currentState.ValueA,
+		ValueB:    currentState.ValueB,
+		Round:     currentState.Round,
 		Signature: sig,
 	}
 	enc := gob.NewEncoder(b.peer)

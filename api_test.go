@@ -84,11 +84,11 @@ func TestWalkthrough(t *testing.T) {
 	}
 	// A sends valueA, valueB, round and sig to B
 	// B inserts the values into its object
-	if err := channelB.ReceivedSignature(channel.ValueA, channel.ValueB, channel.Round, sigA); err != nil {
+	if err := channelB.ReceivedMoney(channel.valueA, channel.valueB, channel.round, sigA); err != nil {
 		t.Fatal(err)
 	}
 	// B signs cooperative close
-	hash, err := channelB.CreateCooperativeClose()
+	hash, err := channelB.CreateCoopClose()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestWalkthrough(t *testing.T) {
 	}
 	// B sends valueA, valueB, round and sig to A
 	// A inserts the values into its object
-	if err := channel.ReceivedSignature(channelB.ValueA, channelB.ValueB, l2.CoopCloseRound, sig); err != nil {
+	if err := channel.ReceivedMoney(channelB.valueA, channelB.valueB, l2.CoopCloseRound, sig); err != nil {
 		t.Fatal(err)
 	}
 	// A sends coop close
