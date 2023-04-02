@@ -38,50 +38,85 @@ type roundStr struct {
 	peerSig []byte
 }
 
+// Channel wraps an SSPC payment channel.
 type Channel struct {
-	channel *l2.Channel
-	backend Backend
-	ID      [32]byte
-	A       common.Address
-	B       common.Address
-	ValueA  *big.Int
-	ValueB  *big.Int
-	Round   *big.Int
-	// internal fields
+	channel        *l2.Channel
+	backend        Backend
+	metadata       MetaData
+	valueA         *big.Int
+	valueB         *big.Int
+	round          *big.Int
 	sumFunds       *big.Int
 	peerSigs       map[*big.Int]*roundStr
 	userIsProposer bool
+	inactive       bool
 }
 
+// NewChannel initializes the channel object.
 func NewChannel(backend Backend, addrA, addrB common.Address, valueA, valueB *big.Int) (*Channel, error) {
 	channel, err := l2.NewChannel(ChannelAddr, backend)
 	if err != nil {
 		return nil, err
 	}
+
+	metadata := MetaData{
+		A: addrA,
+		B: addrB,
+	}
+
 	return &Channel{
 		channel:  channel,
 		backend:  backend,
-		A:        addrA,
-		B:        addrB,
-		ValueA:   valueA,
-		ValueB:   valueB,
-		Round:    big.NewInt(0),
+		metadata: metadata,
+		valueA:   valueA,
+		valueB:   valueB,
+		round:    big.NewInt(0),
 		sumFunds: new(big.Int).Add(valueA, valueB),
 		peerSigs: make(map[*big.Int]*roundStr),
 	}, nil
 }
 
+// State contains the state of a channel.
+type State struct {
+	ValueA *big.Int
+	ValueB *big.Int
+	Round  *big.Int
+}
+
+// Current state returns the state of a channel.
+func (c *Channel) CurrentState() State {
+	return State{
+		ValueA: c.valueA,
+		ValueB: c.valueB,
+		Round:  c.round,
+	}
+}
+
+// MetaData contains metadata concerning the channel.
+type MetaData struct {
+	ID [32]byte
+	A  common.Address
+	B  common.Address
+}
+
+// Current state returns the metadata of a channel.
+func (c *Channel) MetaData() MetaData {
+	return c.metadata
+}
+
+// Open proposes to open a channel with the initially provided parameters.
+// Open returns the resulting channel ID.
 func (c *Channel) Open(auth *bind.TransactOpts) ([32]byte, error) {
 	var id [32]byte
 	if _, err := crand.Read(id[:]); err != nil {
 		return [32]byte{}, err
 	}
-	auth.Value = c.ValueA
+	auth.Value = c.valueA
 	defer func() {
 		auth.Value = big.NewInt(0)
 	}()
 
-	tx, err := c.channel.Open(auth, id, c.B, c.ValueA, c.ValueB)
+	tx, err := c.channel.Open(auth, id, c.metadata.B, c.valueA, c.valueB)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -89,12 +124,13 @@ func (c *Channel) Open(auth *bind.TransactOpts) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 	c.userIsProposer = true
-	c.ID = id
+	c.metadata.ID = id
 	return id, nil
 }
 
+// Accept accepts the proposed channel opening with ID id.
 func (c *Channel) Accept(auth *bind.TransactOpts, id [32]byte) error {
-	auth.Value = c.ValueB
+	auth.Value = c.valueB
 	defer func() {
 		auth.Value = big.NewInt(0)
 	}()
@@ -107,16 +143,18 @@ func (c *Channel) Accept(auth *bind.TransactOpts, id [32]byte) error {
 		return err
 	}
 	c.userIsProposer = false
-	c.ID = id
+	c.metadata.ID = id
 	return nil
 }
 
+// CoopClose sends a cooperative close with the latest channel state.
+// The latest channel state must be a valid cooperative close message.
 func (c *Channel) CoopClose(auth *bind.TransactOpts) error {
 	round, err := c.latestPeerSig()
 	if err != nil {
 		return err
 	}
-	tx, err := c.channel.CooperativeClose(auth, c.ID, round.valueA, round.valueB, round.peerSig)
+	tx, err := c.channel.CooperativeClose(auth, c.metadata.ID, round.valueA, round.valueB, round.peerSig)
 	if err != nil {
 		return err
 	}
@@ -124,14 +162,31 @@ func (c *Channel) CoopClose(auth *bind.TransactOpts) error {
 	return mustMine(c.backend, tx)
 }
 
-func (c *Channel) StartForceClose(auth *bind.TransactOpts, peerSignature []byte) (time.Time, error) {
+// CreateCoopClose creates the hash of a coop close which needs to be signed and send to a peer.
+// Once a coop close is signed, the channel must not be used to send transactions anymore.
+func (c *Channel) CreateCoopClose() ([32]byte, error) {
+	hash, err := l2.HashState(c.channel, c.metadata.ID, c.metadata.A, c.metadata.B, c.valueA, c.valueB, l2.CoopCloseRound)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	c.inactive = true
+	return hash, nil
+}
+
+// StartForceClose starts the forceful closure procedure with the latest peer signature.
+// It returns the time when the force close is successful.
+func (c *Channel) StartForceClose(auth *bind.TransactOpts) (time.Time, error) {
+	round, err := c.latestPeerSig()
+	if err != nil {
+		return time.Time{}, err
+	}
 	// Setup event watching
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	ch := make(chan *l2.ChannelClosing)
-	c.channel.WatchClosing(&bind.WatchOpts{Context: ctx}, ch, [][32]byte{c.ID})
+	c.channel.WatchClosing(&bind.WatchOpts{Context: ctx}, ch, [][32]byte{c.metadata.ID})
 	// Call challenge
-	tx, err := c.channel.Challenge(auth, c.ID, c.ValueA, c.ValueB, c.Round, peerSignature)
+	tx, err := c.channel.Challenge(auth, c.metadata.ID, round.valueA, round.valueB, round.number, round.peerSig)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -142,7 +197,7 @@ func (c *Channel) StartForceClose(auth *bind.TransactOpts, peerSignature []byte)
 	timer := time.NewTimer(defaultTimeout)
 	select {
 	case event := <-ch:
-		if event.Round.Cmp(c.Round) < 0 {
+		if event.Round.Cmp(c.round) < 0 {
 			return time.Time{}, &ChallengeError{round: event.Round}
 		}
 		return time.Unix(int64(event.Time), 0), nil
@@ -151,11 +206,13 @@ func (c *Channel) StartForceClose(auth *bind.TransactOpts, peerSignature []byte)
 	}
 }
 
-func (c *Channel) Dispute(auth *bind.TransactOpts, start uint64) (time.Time, error) {
+// DisputeForceClose disputes a force close procedure.
+// It returns the time when the force close is finished.
+func (c *Channel) DisputeForceClose(auth *bind.TransactOpts, start uint64) (time.Time, error) {
 	// Setup event filtering
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	it, err := c.channel.FilterClosing(&bind.FilterOpts{Context: ctx, Start: start}, [][32]byte{c.ID})
+	it, err := c.channel.FilterClosing(&bind.FilterOpts{Context: ctx, Start: start}, [][32]byte{c.metadata.ID})
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -166,22 +223,23 @@ func (c *Channel) Dispute(auth *bind.TransactOpts, start uint64) (time.Time, err
 	if newest == nil {
 		return time.Time{}, errors.New("no dispute event found")
 	}
-	if newest.Round.Cmp(c.Round) > 0 {
-		return time.Time{}, fmt.Errorf("dispute has higher round than local, local: %v, onchain: %v", c.Round, newest.Round)
+	if newest.Round.Cmp(c.round) > 0 {
+		return time.Time{}, fmt.Errorf("dispute has higher round than local, local: %v, onchain: %v", c.round, newest.Round)
 	}
 
-	fmt.Printf("Disputed with old state: %v got %v", newest.Round, c.Round)
-	// Setup event watching
-	ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-	ch := make(chan *l2.ChannelClosing)
-	c.channel.WatchClosing(&bind.WatchOpts{Context: ctx}, ch, [][32]byte{c.ID})
 	// Call challenge
 	round, err := c.latestPeerSig()
 	if err != nil {
 		return time.Time{}, err
 	}
-	tx, err := c.channel.DisputeChallenge(auth, c.ID, round.valueA, round.valueB, round.number, round.peerSig)
+	fmt.Printf("Disputed with old state: %v got %v", newest.Round, round.number)
+	// Setup event watching
+	ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	ch := make(chan *l2.ChannelClosing)
+	c.channel.WatchClosing(&bind.WatchOpts{Context: ctx}, ch, [][32]byte{c.metadata.ID})
+
+	tx, err := c.channel.DisputeChallenge(auth, c.metadata.ID, round.valueA, round.valueB, round.number, round.peerSig)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -192,7 +250,7 @@ func (c *Channel) Dispute(auth *bind.TransactOpts, start uint64) (time.Time, err
 	timer := time.NewTimer(defaultTimeout)
 	select {
 	case event := <-ch:
-		if event.Round.Cmp(c.Round) < 0 {
+		if event.Round.Cmp(c.round) < 0 {
 			return time.Time{}, &ChallengeError{round: event.Round}
 		}
 		return time.Unix(int64(event.Time), 0), nil
@@ -201,15 +259,23 @@ func (c *Channel) Dispute(auth *bind.TransactOpts, start uint64) (time.Time, err
 	}
 }
 
-func (c *Channel) FinishForceClose(auth *bind.TransactOpts, peerSignature []byte) error {
-	tx, err := c.channel.ForceClose(auth, c.ID)
+// FinishForceClose distributes the money after a force close is concluded.
+// This can happen both after a StartForceClose or a DisputeForceClose.
+func (c *Channel) FinishForceClose(auth *bind.TransactOpts) error {
+	tx, err := c.channel.ForceClose(auth, c.metadata.ID)
 	if err != nil {
 		return err
 	}
 	return mustMine(c.backend, tx)
 }
 
+// SendMoney returns the hash of the state after the value is transfered.
+// This hash needs to be signed and send to the peer.
 func (c *Channel) SendMoney(value *big.Int) ([32]byte, error) {
+	if c.inactive {
+		return common.Hash{}, errors.New("cooperative close called, sending money now is impossible")
+	}
+
 	// TODO return mimedata for signing
 	var (
 		valA  *big.Int
@@ -217,58 +283,54 @@ func (c *Channel) SendMoney(value *big.Int) ([32]byte, error) {
 		round *big.Int
 	)
 	if c.userIsProposer {
-		if value.Cmp(c.ValueA) > 0 {
+		if value.Cmp(c.valueA) > 0 {
 			return common.Hash{}, errors.New("not enough funds")
 		}
-		valA = new(big.Int).Sub(c.ValueA, value)
-		valB = new(big.Int).Add(c.ValueB, value)
-		round = new(big.Int).Add(c.Round, big.NewInt(1))
+		valA = new(big.Int).Sub(c.valueA, value)
+		valB = new(big.Int).Add(c.valueB, value)
+		round = new(big.Int).Add(c.round, big.NewInt(1))
 
 	} else {
-		if value.Cmp(c.ValueB) > 0 {
+		if value.Cmp(c.valueB) > 0 {
 			return common.Hash{}, errors.New("not enough funds")
 		}
-		valA = new(big.Int).Add(c.ValueA, value)
-		valB = new(big.Int).Sub(c.ValueB, value)
-		round = new(big.Int).Add(c.Round, big.NewInt(1))
+		valA = new(big.Int).Add(c.valueA, value)
+		valB = new(big.Int).Sub(c.valueB, value)
+		round = new(big.Int).Add(c.round, big.NewInt(1))
 	}
-	hash, err := l2.HashState(c.channel, c.ID, c.A, c.B, valA, valB, round)
+	hash, err := l2.HashState(c.channel, c.metadata.ID, c.metadata.A, c.metadata.B, valA, valB, round)
 	if err != nil {
 		return common.Hash{}, err
 	}
-	c.ValueA = valA
-	c.ValueB = valB
-	c.Round = round
+	c.valueA = valA
+	c.valueB = valB
+	c.round = round
 	return hash, nil
 }
 
-func (c *Channel) CreateCooperativeClose() ([32]byte, error) {
-	hash, err := l2.HashState(c.channel, c.ID, c.A, c.B, c.ValueA, c.ValueB, l2.CoopCloseRound)
-	return hash, err
-}
-
-func (c *Channel) ReceivedSignature(valueA, valueB, round *big.Int, sig []byte) error {
+// ReceivedMoney updates the local channel state with the new values received from our peer.
+func (c *Channel) ReceivedMoney(valueA, valueB, round *big.Int, sig []byte) error {
 	if new(big.Int).Add(valueA, valueB).Cmp(c.sumFunds) != 0 {
 		return fmt.Errorf("sum of funds not equal, want: %v got %v and %v", c.sumFunds, valueA, valueB)
 	}
-	if round.Cmp(c.Round) <= 0 && c.Round.Cmp(l2.CoopCloseRound) != 0 {
-		return fmt.Errorf("invalid round: got %v local %v", round, c.Round)
+	if round.Cmp(c.round) <= 0 && c.round.Cmp(l2.CoopCloseRound) != 0 {
+		return fmt.Errorf("invalid round: got %v local %v", round, c.round)
 	}
-	hash, err := l2.HashState(c.channel, c.ID, c.A, c.B, valueA, valueB, round)
+	hash, err := l2.HashState(c.channel, c.metadata.ID, c.metadata.A, c.metadata.B, valueA, valueB, round)
 	if err != nil {
 		return err
 	}
 	var signer common.Address
 	if c.userIsProposer {
-		if c.ValueA.Cmp(valueA) > 0 {
-			return fmt.Errorf("valueA decreased by B, from %v to %v", c.ValueA, valueA)
+		if c.valueA.Cmp(valueA) > 0 {
+			return fmt.Errorf("valueA decreased by B, from %v to %v", c.valueA, valueA)
 		}
-		signer = c.B
+		signer = c.metadata.B
 	} else {
-		if c.ValueB.Cmp(valueB) > 0 {
-			return fmt.Errorf("valueB decreased by A, from %v to %v", c.ValueB, valueB)
+		if c.valueB.Cmp(valueB) > 0 {
+			return fmt.Errorf("valueB decreased by A, from %v to %v", c.valueB, valueB)
 		}
-		signer = c.A
+		signer = c.metadata.A
 	}
 	sig[len(sig)-1] -= 27
 	pkBytes, err := crypto.Ecrecover(hash[:], sig)
@@ -290,9 +352,9 @@ func (c *Channel) ReceivedSignature(valueA, valueB, round *big.Int, sig []byte) 
 		valueB:  valueB,
 		peerSig: sig,
 	}
-	c.Round = round
-	c.ValueA = valueA
-	c.ValueB = valueB
+	c.round = round
+	c.valueA = valueA
+	c.valueB = valueB
 	c.peerSigs[round] = rnd
 	return nil
 }
@@ -312,13 +374,13 @@ func mustMine(backend Backend, tx *types.Transaction) error {
 
 func (c *Channel) latestPeerSig() (*roundStr, error) {
 	min := big.NewInt(0)
-	if c.Round.Cmp(big.NewInt(2)) > 0 {
-		min = new(big.Int).Sub(c.Round, big.NewInt(2))
+	if c.round.Cmp(big.NewInt(2)) > 0 {
+		min = new(big.Int).Sub(c.round, big.NewInt(2))
 	}
-	for i := c.Round; i.Cmp(min) > 0; i.Sub(i, big.NewInt(1)) {
+	for i := c.round; i.Cmp(min) > 0; i.Sub(i, big.NewInt(1)) {
 		if c.peerSigs[i] != nil {
 			return c.peerSigs[i], nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find proper signature within round %v", c.Round)
+	return nil, fmt.Errorf("couldn't find proper signature within round %v", c.round)
 }

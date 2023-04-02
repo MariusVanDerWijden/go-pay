@@ -29,3 +29,18 @@ The mainnet contracts in package `mainnet/contracts` are designed to be optimal 
 The folder `cmd/deploy` contains a small program to deploy the contracts on a blockchain.
 The folder `cmd/gopay` contains a small sample project that should show the usage of the golang API.
 It showcases a full node implementation that can be used between two peers to send funds between each other.
+
+## API
+SPCC provides the following API:
+- `NewChannel()` to initialize the channel object
+- `MetaData()` returns the metadata of the channel 
+- `CurrentState()` returns the most recent state of the channel
+- `Open()` proposes the channel opening 
+- `Accept()` accepts the channel opening
+- `CreateCoopClose()` creates a cooperative close that needs to be signed
+- `CoopClose()` send a cooperative closing message
+- `StartForceClose()` starts the force closing procedure
+- `DisputeForceClose()` disputes a force close
+- `FinishForceClose()` finishes the force close
+- `SendMoney()` send money to a peer
+- `ReceivedMoney()` update the state with a received money notice
