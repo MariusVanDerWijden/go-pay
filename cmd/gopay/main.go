@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/external"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -26,12 +27,15 @@ type Backend struct {
 }
 
 func main() {
+	backend := Backend{}
+	if len(os.Args) > 1 {
+		setupNodeFromConfig(&backend, os.Args[1])
+	}
 	color.Green("Welcome to go-pay")
 	promptInit := promptui.Select{
 		Label: "Choose one of the following options",
 		Items: []string{"Start Listener", "Connect to Peer", "Connect to Blockchain", "Setup External Signer (clef)", "Setup Channel"},
 	}
-	backend := Backend{}
 
 	for {
 		index, _, err := promptInit.Run()
@@ -111,6 +115,11 @@ func (b *Backend) setupExternalSigner() error {
 	sig, err := external.NewExternalSigner(str)
 	if err != nil {
 		return err
+	}
+	accs := sig.Accounts()
+	color.Green("Accounts: ")
+	for i, acc := range accs {
+		color.Green("%v: %v", i, acc.Address)
 	}
 	b.signer = sig
 	return nil
