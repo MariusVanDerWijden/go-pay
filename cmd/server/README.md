@@ -1,0 +1,3 @@
+# SSPC Server
+
+Server implementation that provides a (stateful) REST API for clients to talk to. Should be used as a convenience layer for SSPC. The server should not handle any keys and should not be relied upon for maintaining the state of the channels. The channel state should be stored by clients, However they might choose to update the server as a backup/communication layer. The data on the server is public, so don't expect any privacy for channels. 
