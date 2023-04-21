@@ -1,6 +1,6 @@
 module github.com/mariusvanderwijden/go-pay
 
-go 1.16
+go 1.19
 
 require (
 	github.com/BurntSushi/toml v1.1.0
