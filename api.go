@@ -208,7 +208,7 @@ func (c *Channel) StartForceClose(auth *bind.TransactOpts) (time.Time, error) {
 
 // DisputeForceClose disputes a force close procedure.
 // It returns the time when the force close is finished.
-// `startBlock` denotes a block resonably long before the force close happened.
+// `startBlock` denotes a block reasonably long before the force close happened.
 func (c *Channel) DisputeForceClose(auth *bind.TransactOpts, startBlock uint64) (time.Time, error) {
 	// Setup event filtering
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
@@ -270,7 +270,7 @@ func (c *Channel) FinishForceClose(auth *bind.TransactOpts) error {
 	return mustMine(c.backend, tx)
 }
 
-// SendMoney returns the hash of the state after the value is transfered.
+// SendMoney returns the hash of the state after the value is transferred.
 // This hash needs to be signed and send to the peer.
 func (c *Channel) SendMoney(value *big.Int) ([32]byte, error) {
 	if c.inactive {
