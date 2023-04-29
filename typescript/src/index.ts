@@ -1,1 +1,1 @@
-export {NewChannel} from './spcc'
+export {Round, Channel} from './spcc'

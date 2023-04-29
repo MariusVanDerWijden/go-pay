@@ -1,51 +1,128 @@
-import { ethers } from "ethers";
+import { ethers, makeError } from "ethers";
 
-type Round = {
+// CoopCloseRound 
+// CoopCloseRound, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffff", 0)
+var CoopCloseRound: bigint
+
+export class Round {
     number: bigint
     valueA: bigint
     valueB: bigint
-    peerSigs: ethers.Signature[]
+    peerSigs: string[] | undefined
+
+    constructor(number: bigint, valueA: bigint, valueB: bigint, sig: string) {
+        this.number = number
+        this.valueA = valueA
+        this.valueB = valueB
+        this.peerSigs = new Array
+        this.peerSigs[0] = sig
+    }
 }
 
-export function NewChannel(
-    backend: ethers.Signer, 
-    addrA: ethers.Addressable, 
-    addrB: ethers.Addressable, 
-    valueA: bigint, 
-    valueB: bigint): Channel 
-{
-    let ch: Channel
-    ch.backend = backend
-    ch.addrA = addrA
-    ch.addrB = addrB
-    ch.valueA = valueA
-    ch.valueB = valueB
-    ch.sumFunds = valueA + valueB
-    let firstRound: Round
-    firstRound.number = 0n
-    firstRound.valueA = valueA
-    firstRound.valueB = valueB
-    ch.rounds = new Map<bigint, Round>([
-        [0n, firstRound]
-    ]);
-    return ch
-}
-
-class Channel {
-    contract: ethers.Contract;
+export class Channel {
+    contract: ethers.Contract | undefined; // TODO remove undefined
     backend: ethers.Signer;
-    ID: string
-    addrA: ethers.Addressable
-    addrB: ethers.Addressable
+    ID: string | undefined
+    addrA: string
+    addrB: string
     valueA: bigint
     valueB: bigint
+    round: bigint
     sumFunds: bigint
     rounds: Map<bigint, Round>
     userIsProposer: boolean
 
+
+    constructor(
+        backend: ethers.Signer, 
+        addrA: string, 
+        addrB: string, 
+        valueA: bigint, 
+        valueB: bigint)
+    {
+        this.backend = backend
+        this.addrA = addrA
+        this.addrB = addrB
+        this.valueA = valueA
+        this.valueB = valueB
+        this.round = 0n
+        this.userIsProposer = false;
+        this.sumFunds = valueA + valueB
+        let firstRound = new Round(0n, valueA, valueB, "");
+        this.rounds = new Map<bigint, Round>([
+            [0n, firstRound]
+        ]);
+}
+
+
+    CurrentState(this: Channel): Round | undefined {
+        return this.rounds.get(this.round)
+    }
+
     Open(this: Channel): string {
         let id = ""
         // let id = crypto.randomBytes
+        this.userIsProposer = true
         return id;
     };
+
+    Accept(this: Channel): string {
+        this.userIsProposer = false
+        return ""
+    }
+
+    CoopClose(this: Channel): string {
+        return ""
+    }
+
+    CreateCoopClose(this: Channel): string {
+        return ""
+    }
+
+    StartForceClose(this: Channel): string {
+        return ""
+    }
+
+    DisputeForceClose(this: Channel): string {
+        return ""
+    }
+
+    FinishForceClose(this: Channel): string {
+        return ""
+    }
+
+    SendMoney(this: Channel): string {
+        return ""
+    }
+
+    ReceivedMoney(this: Channel, valueA: bigint, valueB: bigint, round: bigint, sig: string): string {
+        if(valueA + valueB > this.sumFunds) {
+            return "sum of funds not equal" // TODO error handling
+        }
+        if(round <= this.round || this.round != CoopCloseRound) {
+            return "invalid round" // TODO error handling
+        }
+        var hash = "TODO"
+
+        var signer: string
+        if(this.userIsProposer) {
+            if(this.valueA < valueA) {
+                return "valueA decreased by B" // TODO
+            }
+            signer = this.addrB
+        } else {
+            if(this.valueB < valueB) {
+                return "valueB decreased by A" // TODO
+            }
+            signer = this.addrA
+        }
+        let recovered = ethers.recoverAddress(hash, sig)
+        if(recovered != signer) {
+            return "invalid signer"
+        }
+        var newRound = new Round(round, valueA, valueB, sig)
+        this.rounds.set(round, newRound)
+        return ""  
+    }
+    
 }

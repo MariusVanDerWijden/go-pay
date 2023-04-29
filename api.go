@@ -314,7 +314,7 @@ func (c *Channel) ReceivedMoney(valueA, valueB, round *big.Int, sig []byte) erro
 	if new(big.Int).Add(valueA, valueB).Cmp(c.sumFunds) != 0 {
 		return fmt.Errorf("sum of funds not equal, want: %v got %v and %v", c.sumFunds, valueA, valueB)
 	}
-	if round.Cmp(c.round) <= 0 && c.round.Cmp(l2.CoopCloseRound) != 0 {
+	if round.Cmp(c.round) <= 0 || c.round.Cmp(l2.CoopCloseRound) != 0 {
 		return fmt.Errorf("invalid round: got %v local %v", round, c.round)
 	}
 	hash, err := l2.HashState(c.channel, c.metadata.ID, c.metadata.A, c.metadata.B, valueA, valueB, round)
