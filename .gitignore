@@ -3,3 +3,4 @@ cmd/gopay/audit.log
 cmd/deploy/deploy
 *.abi
 *.bin
+typescript/node_modules/*

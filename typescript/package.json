@@ -1,0 +1,13 @@
+{
+    "name": "spcc",
+    "version": "1.0.0",
+    "description": "Stupid Simple Payment Channels",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "/dist"
+    ],
+    "dependencies": {
+        "ethers": "^6.3.0"
+    }
+}
